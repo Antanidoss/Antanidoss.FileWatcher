@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
+	"syscall"
 	"time"
 
 	"github.com/Antanidoss/fileWatcher/models"
@@ -28,9 +28,8 @@ func Start(watcher *models.Watcher) error {
 		watcher.TimeoutInSeconds = 200
 	}
 
+	watcher.TrackedFiles = *getFiles(watcher.DirectoryPath, watcher.WatchNestedDirectories)
 	watcher.Working = true
-
-	watcher.TrackedFiles = *createFolderState(watcher.DirectoryPath, watcher.WatchNestedDirectories)
 
 	go watch(watcher)
 
@@ -41,7 +40,7 @@ func Stop(watcher *models.Watcher) {
 	watcher.Working = false
 }
 
-func createFolderState(directoryPath string, watchNestedDirectories bool) *[]models.File {
+func getFiles(directoryPath string, watchNestedDirectories bool) *[]models.File {
 	var files []models.File
 
 	filepath.Walk(directoryPath, func(path string, info os.FileInfo, err error) error {
@@ -49,11 +48,20 @@ func createFolderState(directoryPath string, watchNestedDirectories bool) *[]mod
 			return err
 		}
 
-		if info.IsDir() {
+		if info.IsDir() /*|| (!watchNestedDirectories && directoryPath != filepath.Base(path))*/ {
 			return nil
 		}
 
-		files = append(files, models.File{Name: info.Name(), FullName: path})
+		file := models.File{Name: info.Name(), FullName: path, ModTime: info.ModTime()}
+
+		if runtime.GOOS == "windows" {
+			d := info.Sys().(*syscall.Win32FileAttributeData)
+			file.CreationTime = time.Unix(0, d.CreationTime.Nanoseconds())
+		} else {
+
+		}
+
+		files = append(files, file)
 
 		return nil
 	})
@@ -70,15 +78,23 @@ func watch(watcher *models.Watcher) {
 		}
 
 		if !watcher.WatchNestedDirectories {
-			files, _ := ioutil.ReadDir(watcher.DirectoryPath)
+			files := *getFiles(watcher.DirectoryPath, watcher.WatchNestedDirectories)
 
 			for _, file := range files {
-				checkCreatedFile(watcher, file)
+				if !isExistingFile(&watcher.TrackedFiles, file) {
+					watcher.OnCreatedFile(models.EventFileWatcherMessage{DirectoryPath: watcher.DirectoryPath, FilePath: file.FullName, NotificationType: models.CreatedFile})
+				}
 			}
 		}
 	}
 }
 
-func checkCreatedFile(watcher *models.Watcher, file fs.FileInfo) {
+func isExistingFile(files *[]models.File, file models.File) bool {
+	for _, item := range *files {
+		if item.FullName == file.FullName {
+			return true
+		}
+	}
 
+	return false
 }

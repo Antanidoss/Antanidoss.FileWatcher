@@ -4,7 +4,7 @@ type Watcher struct {
 	DirectoryPath          string
 	WatchNestedDirectories bool
 	Working                bool
-	TimeoutInSeconds       int
+	TimeoutInSeconds       uint
 	TrackedFiles           []File
 	OnCreatedFile          func(message EventFileWatcherMessage)
 	OnRemoveFile           func(message EventFileWatcherMessage)
