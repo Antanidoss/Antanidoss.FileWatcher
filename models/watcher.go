@@ -5,7 +5,7 @@ type Watcher struct {
 	WatchNestedDirectories bool
 	Working                bool
 	TimeoutInSeconds       int
-	State                  Folder
+	TrackedFiles           []File
 	OnCreatedFile          func(message EventFileWatcherMessage)
 	OnRemoveFile           func(message EventFileWatcherMessage)
 	OnAnyChange            func(message EventFileWatcherMessage)
