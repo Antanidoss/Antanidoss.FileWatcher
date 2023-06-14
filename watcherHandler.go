@@ -81,20 +81,47 @@ func watch(watcher *models.Watcher) {
 			files := *getFiles(watcher.DirectoryPath, watcher.WatchNestedDirectories)
 
 			for _, file := range files {
-				if !isExistingFile(&watcher.TrackedFiles, file) {
+				if !isCreatedFile(&watcher.TrackedFiles, &file) {
+					watcher.TrackedFiles = append(watcher.TrackedFiles, file)
 					watcher.OnCreatedFile(models.EventFileWatcherMessage{DirectoryPath: watcher.DirectoryPath, FilePath: file.FullName, NotificationType: models.CreatedFile})
+				} else if isRemovedFiles(&watcher.TrackedFiles, &file) {
+					watcher.TrackedFiles = removeTrackedFile(watcher.TrackedFiles, &file)
+					watcher.OnRemoveFile(models.EventFileWatcherMessage{DirectoryPath: watcher.DirectoryPath, FilePath: file.FullName, NotificationType: models.RemovedFile})
 				}
 			}
 		}
 	}
 }
 
-func isExistingFile(files *[]models.File, file models.File) bool {
-	for _, item := range *files {
+func isCreatedFile(currentFiles *[]models.File, file *models.File) bool {
+	for _, item := range *currentFiles {
 		if item.FullName == file.FullName {
 			return true
 		}
 	}
 
 	return false
+}
+
+func isRemovedFiles(currentFiles *[]models.File, file *models.File) bool {
+	for _, item := range *currentFiles {
+		if item.FullName == file.FullName {
+			return false
+		}
+	}
+
+	return true
+}
+
+func removeTrackedFile(trackedFiles []models.File, file *models.File) []models.File {
+	var removedFileIndex int
+
+	for i := 0; i < len(trackedFiles); i++ {
+		if trackedFiles[i].FullName == file.FullName {
+			removedFileIndex = i
+		}
+	}
+
+	trackedFiles[removedFileIndex] = trackedFiles[len(trackedFiles)-1]
+	return trackedFiles[:len(trackedFiles)-1]
 }
